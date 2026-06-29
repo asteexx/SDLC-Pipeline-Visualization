@@ -1,0 +1,118 @@
+{
+  "_note": "Audit F7 — the single canonical pipeline DAG. This is the ONE source of truth for phase order and dependencies. orchestrator.md's stage table and pipeline_state.json.stages_completed MUST be generated from / reconciled against this file. Key invariant: `design` precedes `qa_generate` because qa_generate declares spec/design.md as a required input.",
+  "version": 2,
+  "canonical_order": [
+    "requirements",
+    "planning",
+    "design",
+    "qa_generate",
+    "implementation",
+    "review",
+    "qa_validate",
+    "security",
+    "deployment"
+  ],
+  "nodes": {
+    "requirements": {
+      "agent": "product_agent",
+      "model": "claude-opus-4-8",
+      "inputs": ["user_prompt"],
+      "outputs": ["spec/requirements.md"],
+      "depends_on": [],
+      "checkpoint": { "id": "cp_01_requirements", "type": "mandatory" }
+    },
+    "planning": {
+      "agent": "planner_agent",
+      "model": "claude-haiku-4-5-20251001",
+      "inputs": ["spec/requirements.md"],
+      "outputs": ["spec/tasks.md", ".claude/worktree_map.json"],
+      "depends_on": ["requirements"],
+      "checkpoint": { "id": "cp_02_planning", "type": "conditional" }
+    },
+    "design": {
+      "agent": "architect_agent",
+      "model": "claude-opus-4-8",
+      "inputs": ["spec/requirements.md", "spec/tasks.md"],
+      "outputs": ["spec/design.md"],
+      "depends_on": ["planning"],
+      "checkpoint": { "id": "cp_03_design", "type": "conditional" }
+    },
+    "qa_generate": {
+      "agent": "qa_agent (GENERATE)",
+      "model": "claude-sonnet-4-6",
+      "inputs": ["spec/requirements.md", "spec/design.md"],
+      "outputs": ["spec/generated_tests/"],
+      "depends_on": ["design"],
+      "_dependency_note": "MUST run after design — declares spec/design.md as a required input (fixes F7).",
+      "checkpoint": null
+    },
+    "implementation": {
+      "agent": "developer_agent",
+      "model": "claude-sonnet-4-6",
+      "inputs": ["spec/tasks.md", "spec/design.md", "spec/generated_tests/"],
+      "outputs": ["src/", "done_evidence.json", "feature_list.json (registers passes:false)"],
+      "depends_on": ["qa_generate"],
+      "checkpoint": null
+    },
+    "review": {
+      "agent": "review_agent",
+      "model": "claude-sonnet-4-6 (escalates to claude-opus-4-8 on hotspot/security diffs)",
+      "inputs": ["git_diff", "spec/requirements.md", "spec/design.md", "spec/generated_tests/"],
+      "outputs": ["review_report.json"],
+      "depends_on": ["implementation"],
+      "checkpoint": { "id": "cp_04_code_review", "type": "conditional" }
+    },
+    "qa_validate": {
+      "agent": "qa_agent (VALIDATE)",
+      "model": "claude-sonnet-4-6",
+      "inputs": ["spec/generated_tests/", "src/", "feature_list.json"],
+      "outputs": ["test_results.json", "done_evidence.json", "feature_list.json (passes flipped via Stop-hook)"],
+      "depends_on": ["review"],
+      "checkpoint": { "id": "cp_05_qa", "type": "conditional" }
+    },
+    "security": {
+      "agent": "security_agent",
+      "model": "claude-opus-4-8",
+      "inputs": ["src/", "spec/design.md", "spec/requirements.md"],
+      "outputs": ["security_report.json"],
+      "depends_on": ["qa_validate"],
+      "checkpoint": { "id": "cp_06_security", "type": "conditional" }
+    },
+    "deployment": {
+      "agent": "devops_agent",
+      "model": "claude-sonnet-4-6",
+      "inputs": ["feature_list.json", "security_report.json"],
+      "outputs": ["deploy artifacts", "run_summary.json"],
+      "depends_on": ["security"],
+      "checkpoint": [
+        { "id": "cp_07_deployment_1pct", "type": "conditional" },
+        { "id": "cp_08_production_promotion", "type": "mandatory" }
+      ]
+    }
+  },
+  "diff_agent": {
+    "_note": "Not a linear stage. Invoked by the orchestrator only on a requirements delta; emits spec/rerun_plan.json that prunes the order above to the affected stages.",
+    "agent": "diff_agent",
+    "model": "claude-haiku-4-5-20251001"
+  },
+  "discovery": {
+    "_note": "Depth-4 / R5. Optional Phase-0 node, NOT in canonical_order (like operate/diff_agent). Invoked by the orchestrator only for greenfield/epic scope (sdlc-config.json#discovery); ordinary tasks skip straight to requirements. Frames the problem BEFORE requirements; does NOT freeze them (unfrozen-requirement research stays a spike outside the pipeline — docs/SDLC-SPEC.md §1.6). Adds NO new mandatory gate — brief sign-off folds into cp_01/G1 (engine cp_01–cp_08 untouched).",
+    "agent": "product_agent (DISCOVERY mode)",
+    "model": "claude-opus-4-8",
+    "trigger": "new_product_or_epic",
+    "inputs": ["user_prompt | PRD | interview_notes"],
+    "outputs": ["spec/discovery-brief.md"],
+    "feeds": "requirements (spec/discovery-brief.md becomes an input to /sdlc-refine)",
+    "checkpoint": null
+  },
+  "operate": {
+    "_note": "Not a linear stage (Depth-2 Block 3). Invoked by the orchestrator on a production-incident trigger, NOT part of canonical_order. Mitigates rollback-first via devops_agent, then routes the permanent fix back through the normal stages as a linked Bug (the same gates apply; cp_08 stays mandatory). Emits incidents/<INC-id>.json. Closes the SDLC loop. See docs/INCIDENT.md.",
+    "agent": "devops_agent (mitigation) + orchestrator (routing)",
+    "model": "claude-sonnet-4-6",
+    "trigger": "production_incident",
+    "inputs": ["alert | monitor | user_report | scheduled_scan", "deployment_baseline.json"],
+    "outputs": ["incidents/<INC-id>.json", "post-incident analysis"],
+    "principle": "rollback-first; fix flows through the normal pipeline; blameless post-incident asks which gate should have caught it",
+    "feeds_metrics": ["change_failure_rate", "mttr", "M6_defect_escape"]
+  }
+}

@@ -1,0 +1,49 @@
+{"event":"workspace_init","agent":"system"}
+{"event":"discovery_routed","scope":"epic","ran":true,"artifact":"spec/discovery-brief.md","trace_id":"r0"}
+{"event":"stage_started","stage":"requirements"}
+{"event":"artifact_written","stage":"requirements","artifact":"spec/requirements.md"}
+{"event":"stage_completed","stage":"requirements"}
+{"event":"checkpoint","id":"cp_01_requirements","gate":"G1","stage":"requirements","type":"mandatory","outcome":"approved","note":"intent signed off by human"}
+{"event":"stage_started","stage":"planning"}
+{"event":"checkpoint","id":"cp_02_planning","gate":null,"stage":"planning","type":"conditional","triggered_by":["hotspot_files_count>2"],"outcome":"approved","note":"3 hotspot files — human ok'd the parallel plan"}
+{"event":"stage_completed","stage":"planning"}
+{"event":"stage_started","stage":"design"}
+{"event":"artifact_written","stage":"design","artifact":"spec/design.md"}
+{"event":"checkpoint","id":"cp_03_design","gate":"G2","stage":"design","type":"conditional","outcome":"skipped","note":"no NFR concern, contracts present"}
+{"event":"stage_completed","stage":"design"}
+{"event":"stage_started","stage":"qa_generate"}
+{"event":"artifact_written","stage":"qa_generate","artifact":"spec/generated_tests/"}
+{"event":"stage_completed","stage":"qa_generate"}
+{"event":"stage_started","stage":"implementation"}
+{"event":"quality_gate_fail","stage":"implementation","feature_id":"feat_login","test_command":"pytest tests/test_login.py","live_exit_code":1}
+{"event":"guardrail_block","stage":"implementation","agent":"developer_agent","rule":"AP-105 generated-test immutability","detail":"attempt to edit spec/generated_tests/test_login.py blocked"}
+{"event":"quality_gate_fail","stage":"implementation","feature_id":"feat_login","test_command":"pytest tests/test_login.py","live_exit_code":1}
+{"event":"circuit_breaker","reason":"max_attempts_per_stage","stage":"implementation","attempts":3,"tokens_so_far":82000,"budget":100000,"action":"halt+escalate","trace_id":"r1"}
+{"event":"quality_gate_pass","stage":"implementation","feature_id":"feat_login"}
+{"event":"stage_completed","stage":"implementation"}
+{"event":"change_triage","band":"red","reasons":["auth code touched","security-sensitive diff"],"review":"full+human","trace_id":"r2"}
+{"event":"stage_started","stage":"review"}
+{"event":"checkpoint","id":"cp_04_code_review","gate":"G3","stage":"review","type":"conditional","triggered_by":["review_verdict==request_changes"],"outcome":"rework_required","note":"blocker: missing authZ check on /admin"}
+{"event":"stage_started","stage":"implementation"}
+{"event":"quality_gate_pass","stage":"implementation","feature_id":"feat_login"}
+{"event":"stage_started","stage":"review"}
+{"event":"checkpoint","id":"cp_04_code_review","gate":"G3","stage":"review","type":"conditional","triggered_by":["re-review"],"outcome":"approved","note":"blocker resolved"}
+{"event":"stage_completed","stage":"review"}
+{"event":"stage_started","stage":"qa_validate"}
+{"event":"checkpoint","id":"cp_05_qa","gate":"G4","stage":"qa_validate","type":"conditional","triggered_by":["branch_coverage_pct<80"],"outcome":"approved_with_comments","note":"coverage 76% — human accepted with follow-up"}
+{"event":"stage_completed","stage":"qa_validate"}
+{"event":"stage_started","stage":"security"}
+{"event":"checkpoint","id":"cp_06_security","gate":null,"stage":"security","type":"conditional","triggered_by":["critical_findings>0","secrets_found"],"outcome":"rework_required","note":"hardcoded API key + SQLi in /search"}
+{"event":"stage_started","stage":"implementation"}
+{"event":"quality_gate_pass","stage":"implementation","feature_id":"feat_search"}
+{"event":"stage_started","stage":"security"}
+{"event":"checkpoint","id":"cp_06_security","gate":null,"stage":"security","type":"conditional","triggered_by":["re-scan"],"outcome":"approved","note":"no critical/high after fix"}
+{"event":"stage_completed","stage":"security"}
+{"event":"stage_started","stage":"deployment"}
+{"event":"checkpoint","id":"cp_07_deployment_1pct","gate":null,"stage":"deployment","type":"conditional","triggered_by":["smoke_test_failed","error_rate>0.005"],"outcome":"rework_required","note":"canary unhealthy at 1% — rolled back"}
+{"event":"checkpoint","id":"cp_07_deployment_1pct","gate":null,"stage":"deployment","type":"conditional","triggered_by":["re-deploy"],"outcome":"approved","note":"canary green at 1%"}
+{"event":"checkpoint","id":"cp_08_production_promotion","gate":"G6","stage":"deployment","type":"mandatory","outcome":"approved","note":"promotion past 10% approved by human"}
+{"event":"run_completed","outcome":"completed (recovered from 4 gate rejections)"}
+{"event":"incident_opened","incident_id":"INC-001","severity":"sev-1","detected_by":"monitor","timestamp":"2026-06-26T12:40:00Z","trace_id":"r3"}
+{"event":"incident_resolved","incident_id":"INC-001","fix_deployed_at":"2026-06-26T13:20:00Z","pipeline_delivered":true,"trace_id":"r4"}
+{"event":"optimizer_decision","decision":"rollback","experiment":"review: opus-4-8 -> sonnet-4-6","reason":"coverage floor breached vs baseline (quality veto)","trace_id":"r5"}

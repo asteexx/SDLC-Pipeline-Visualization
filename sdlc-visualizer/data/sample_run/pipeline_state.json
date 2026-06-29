@@ -1,0 +1,48 @@
+{
+  "run_id": "sample_run",
+  "trace_id": "trace_sample_001",
+  "started_at": "2026-06-25T09:00:00Z",
+  "ended_at": "2026-06-25T09:48:00Z",
+  "status": "completed",
+  "current_stage": "deployment",
+  "stages_completed": [
+    "requirements",
+    "planning",
+    "design",
+    "qa_generate",
+    "implementation",
+    "review",
+    "qa_validate",
+    "security",
+    "deployment"
+  ],
+  "awaiting_human": false,
+  "checkpoint_active": null,
+  "rerun_mode": false,
+  "rerun_plan_path": null,
+  "autonomy_stats": {
+    "_note": "Computed from event_log.jsonl stage transitions, NOT seeded constants (audit F8).",
+    "stages_auto": 9,
+    "stages_human": 0,
+    "checkpoints_skipped": 6,
+    "checkpoints_fired": 2
+  },
+  "stage_telemetry": [
+    { "stage": "requirements",   "started_at": "2026-06-25T09:00:00Z", "ended_at": "2026-06-25T09:05:00Z", "duration_s": 300, "tokens_in": 4200, "tokens_out": 1800, "cache_read": 0,     "cache_write": 2100 },
+    { "stage": "planning",       "started_at": "2026-06-25T09:05:00Z", "ended_at": "2026-06-25T09:09:00Z", "duration_s": 240, "tokens_in": 3100, "tokens_out": 1200, "cache_read": 2100,  "cache_write": 600  },
+    { "stage": "design",         "started_at": "2026-06-25T09:09:00Z", "ended_at": "2026-06-25T09:16:00Z", "duration_s": 420, "tokens_in": 6800, "tokens_out": 3400, "cache_read": 2700,  "cache_write": 1500 },
+    { "stage": "qa_generate",    "started_at": "2026-06-25T09:16:00Z", "ended_at": "2026-06-25T09:22:00Z", "duration_s": 360, "tokens_in": 5200, "tokens_out": 2900, "cache_read": 4200,  "cache_write": 900  },
+    { "stage": "implementation", "started_at": "2026-06-25T09:22:00Z", "ended_at": "2026-06-25T09:33:00Z", "duration_s": 660, "tokens_in": 9100, "tokens_out": 5600, "cache_read": 5100,  "cache_write": 1800 },
+    { "stage": "review",         "started_at": "2026-06-25T09:33:00Z", "ended_at": "2026-06-25T09:38:00Z", "duration_s": 300, "tokens_in": 4800, "tokens_out": 1600, "cache_read": 6200,  "cache_write": 400  },
+    { "stage": "qa_validate",    "started_at": "2026-06-25T09:38:00Z", "ended_at": "2026-06-25T09:42:00Z", "duration_s": 240, "tokens_in": 3600, "tokens_out": 1100, "cache_read": 6800,  "cache_write": 300  },
+    { "stage": "security",       "started_at": "2026-06-25T09:42:00Z", "ended_at": "2026-06-25T09:46:00Z", "duration_s": 240, "tokens_in": 5400, "tokens_out": 2200, "cache_read": 5900,  "cache_write": 700  },
+    { "stage": "deployment",     "started_at": "2026-06-25T09:46:00Z", "ended_at": "2026-06-25T09:48:00Z", "duration_s": 120, "tokens_in": 2600, "tokens_out": 900,  "cache_read": 4100,  "cache_write": 200  }
+  ],
+  "criterion_tracking": {
+    "autonomy_rate_pct": 92.6,
+    "artifacts_valid": true,
+    "qa_tests_generated": true,
+    "failures_recovered": 1,
+    "rerun_capable": true
+  }
+}

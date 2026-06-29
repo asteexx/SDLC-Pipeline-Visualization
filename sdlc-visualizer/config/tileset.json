@@ -1,0 +1,52 @@
+{
+  "_note": "Named tile coordinates [col,row] into Room_Builder_32x32.png (32px tiles). Read by tools/render_map.py (PIL verification render) AND index.html (Phaser). Change a coord here and BOTH renderers update. floors.* are per-room-zone floor fills; wall.* build a tileable faux-3D wall.",
+  "sheet": "assets/the_ville/visuals/map_assets/v1/Room_Builder_32x32.png",
+  "tile": 32,
+
+  "floors": {
+    "wood_warm":  [12, 12],
+    "wood_light": [16, 12],
+    "grey_soft":  [46, 32],
+    "tile_teal":  [42, 38],
+    "tile_blue":  [46, 38],
+    "tile_maze":  [42, 32],
+    "stone_dark": [12, 22],
+    "brick_tan":  [1, 28],
+    "carpet_mint":[1, 12]
+  },
+
+  "wall": {
+    "fill":     [15, 1]
+  },
+
+  "_furn_note": "Tile-art furniture from interiors_pt1.png. Each item is [col,row,w,h] in 32px tiles. Placement is computed in code (render_map.py + index.html) identically: a potted plant in each room's bottom inner corners, bookshelves along the Archive back wall.",
+  "furniture": {
+    "sheet": "assets/the_ville/visuals/map_assets/v1/interiors_pt1.png",
+    "items": {
+      "plant_tree": [11, 27, 1, 2],
+      "bookshelf":  [2, 18, 1, 3],
+      "couch":      [7, 13, 3, 2],
+      "chair":      [4, 21, 1, 2],
+      "stool":      [6, 13, 1, 1],
+      "desk":       [1, 10, 2, 3]
+    }
+  },
+
+  "room_floor": {
+    "requirements":     "carpet_mint",
+    "planning":         "wood_warm",
+    "design":           "tile_blue",
+    "qa_generate":      "tile_teal",
+    "implementation":   "wood_warm",
+    "deployment":       "stone_dark",
+    "security":         "stone_dark",
+    "qa_validate":      "tile_teal",
+    "review":           "wood_warm",
+    "archive":          "brick_tan",
+    "orchestrator_hub": "carpet_mint",
+    "checkpoint_gate":  "tile_maze",
+    "production":       "stone_dark",
+    "discovery":        "tile_blue",
+    "corridor":         "grey_soft"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "run_id": "rainy_run",
+  "start_date": "June 26, 2026",
+  "sec_per_step": 10,
+  "maze_name": "office",
+  "persona_names": [
+    "Orchestrator Bot",
+    "Product Analyst",
+    "Planner Bot",
+    "Architect Designer",
+    "QA Engineer",
+    "Dev Engineer",
+    "Review Critic",
+    "Security Analyst",
+    "DevOps Engineer",
+    "Diff Analyst",
+    "Human Lead"
+  ],
+  "step": 1460,
+  "archive_drops": [],
+  "summary": {
+    "stages_completed": 8,
+    "checkpoints_fired": 10,
+    "checkpoints_skipped": 1,
+    "autonomy_rate_pct": 9,
+    "clean_run_autonomy_pct": null,
+    "mandatory_gates": 2,
+    "gate_rejections": 3,
+    "circuit_breaker_trips": 1,
+    "guardrail_blocks": 1,
+    "incidents": 1,
+    "mttr_min": 40,
+    "tokens": null,
+    "cost_usd": null,
+    "optimizer": {
+      "decision": "rollback",
+      "experiment": "review: opus-4-8 -> sonnet-4-6",
+      "reason": "coverage floor breached vs baseline (quality veto)"
+    }
+  }
+}

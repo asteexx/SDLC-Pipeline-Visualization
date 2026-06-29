@@ -1,0 +1,39 @@
+{
+  "run_id": "neon_001",
+  "start_date": "June 26, 2026",
+  "sec_per_step": 10,
+  "maze_name": "office",
+  "persona_names": [
+    "Orchestrator Bot",
+    "Product Analyst",
+    "Planner Bot",
+    "Architect Designer",
+    "QA Engineer",
+    "Dev Engineer",
+    "Review Critic",
+    "Security Analyst",
+    "DevOps Engineer",
+    "Diff Analyst",
+    "Human Lead"
+  ],
+  "step": 1078,
+  "archive_drops": [
+    845
+  ],
+  "summary": {
+    "stages_completed": 8,
+    "checkpoints_fired": 6,
+    "checkpoints_skipped": 3,
+    "autonomy_rate_pct": 33,
+    "clean_run_autonomy_pct": 92.6,
+    "mandatory_gates": 2,
+    "gate_rejections": 1,
+    "circuit_breaker_trips": 1,
+    "guardrail_blocks": 1,
+    "incidents": 0,
+    "mttr_min": null,
+    "tokens": null,
+    "cost_usd": null,
+    "optimizer": null
+  }
+}

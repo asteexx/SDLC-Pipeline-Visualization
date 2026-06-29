@@ -1,0 +1,40 @@
+{
+  "run_id": "sample_run",
+  "start_date": "June 25, 2026",
+  "sec_per_step": 10,
+  "maze_name": "office",
+  "persona_names": [
+    "Orchestrator Bot",
+    "Product Analyst",
+    "Planner Bot",
+    "Architect Designer",
+    "QA Engineer",
+    "Dev Engineer",
+    "Review Critic",
+    "Security Analyst",
+    "DevOps Engineer",
+    "Diff Analyst",
+    "Human Lead"
+  ],
+  "step": 811,
+  "archive_drops": [
+    394,
+    717
+  ],
+  "summary": {
+    "stages_completed": 9,
+    "checkpoints_fired": 2,
+    "checkpoints_skipped": 6,
+    "autonomy_rate_pct": 75,
+    "clean_run_autonomy_pct": 92.6,
+    "mandatory_gates": 2,
+    "gate_rejections": 0,
+    "circuit_breaker_trips": 0,
+    "guardrail_blocks": 0,
+    "incidents": 0,
+    "mttr_min": null,
+    "tokens": null,
+    "cost_usd": null,
+    "optimizer": null
+  }
+}

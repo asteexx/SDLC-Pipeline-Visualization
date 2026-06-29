@@ -1,0 +1,37 @@
+{
+  "run_id": "rerun_delta",
+  "start_date": "June 26, 2026",
+  "sec_per_step": 10,
+  "maze_name": "office",
+  "persona_names": [
+    "Orchestrator Bot",
+    "Product Analyst",
+    "Planner Bot",
+    "Architect Designer",
+    "QA Engineer",
+    "Dev Engineer",
+    "Review Critic",
+    "Security Analyst",
+    "DevOps Engineer",
+    "Diff Analyst",
+    "Human Lead"
+  ],
+  "step": 486,
+  "archive_drops": [],
+  "summary": {
+    "stages_completed": 4,
+    "checkpoints_fired": 1,
+    "checkpoints_skipped": 1,
+    "autonomy_rate_pct": 50,
+    "clean_run_autonomy_pct": 90,
+    "mandatory_gates": 1,
+    "gate_rejections": 0,
+    "circuit_breaker_trips": 0,
+    "guardrail_blocks": 0,
+    "incidents": 0,
+    "mttr_min": null,
+    "tokens": null,
+    "cost_usd": null,
+    "optimizer": null
+  }
+}

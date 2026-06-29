@@ -1,0 +1,40 @@
+{"event":"workspace_init","timestamp":"2026-06-25T08:59:50Z","agent":"system","outcome":"workspace ready"}
+{"event":"stage_started","timestamp":"2026-06-25T09:00:00Z","stage":"requirements","agent":"product_agent"}
+{"event":"artifact_written","timestamp":"2026-06-25T09:04:30Z","stage":"requirements","agent":"product_agent","artifact":"spec/requirements.md"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:05:00Z","stage":"requirements","agent":"product_agent"}
+{"event":"checkpoint","timestamp":"2026-06-25T09:05:10Z","id":"cp_01_requirements","gate":"G1","stage":"requirements","type":"mandatory","trigger":true,"outcome":"approved","note":"requirements signed off by human"}
+{"event":"stage_started","timestamp":"2026-06-25T09:05:30Z","stage":"planning","agent":"planner_agent"}
+{"event":"checkpoint","timestamp":"2026-06-25T09:06:00Z","id":"cp_02_planning","gate":null,"stage":"planning","type":"conditional","trigger":false,"outcome":"skipped","note":"hotspot_files_count <= 2"}
+{"event":"artifact_written","timestamp":"2026-06-25T09:08:30Z","stage":"planning","agent":"planner_agent","artifact":"spec/tasks.md"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:09:00Z","stage":"planning","agent":"planner_agent"}
+{"event":"stage_started","timestamp":"2026-06-25T09:09:30Z","stage":"design","agent":"architect_agent"}
+{"event":"checkpoint","timestamp":"2026-06-25T09:10:00Z","id":"cp_03_design","gate":"G2","stage":"design","type":"conditional","trigger":false,"outcome":"skipped","note":"no new ADR, no breaking contract"}
+{"event":"artifact_written","timestamp":"2026-06-25T09:15:30Z","stage":"design","agent":"architect_agent","artifact":"spec/design.md"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:16:00Z","stage":"design","agent":"architect_agent"}
+{"event":"stage_started","timestamp":"2026-06-25T09:16:30Z","stage":"qa_generate","agent":"qa_agent"}
+{"event":"artifact_written","timestamp":"2026-06-25T09:21:30Z","stage":"qa_generate","agent":"qa_agent","artifact":"spec/generated_tests/"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:22:00Z","stage":"qa_generate","agent":"qa_agent"}
+{"event":"stage_started","timestamp":"2026-06-25T09:22:30Z","stage":"implementation","agent":"developer_agent"}
+{"event":"lint_fail","timestamp":"2026-06-25T09:25:00Z","stage":"implementation","agent":"developer_agent","file":"src/auth/login.ts","outcome":"agent_must_fix"}
+{"event":"quality_gate_fail","timestamp":"2026-06-25T09:27:00Z","stage":"implementation","agent":"developer_agent","feature_id":"feat_login","test_command":"npm test -- auth/login","live_exit_code":1,"outcome":"blocked"}
+{"event":"quality_gate_pass","timestamp":"2026-06-25T09:31:30Z","stage":"implementation","agent":"developer_agent","feature_id":"feat_login","test_command":"npm test -- auth/login","outcome":"allowed"}
+{"event":"artifact_written","timestamp":"2026-06-25T09:32:30Z","stage":"implementation","agent":"developer_agent","artifact":"src/ + feature_list.json"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:33:00Z","stage":"implementation","agent":"developer_agent"}
+{"event":"stage_started","timestamp":"2026-06-25T09:33:30Z","stage":"review","agent":"review_agent"}
+{"event":"checkpoint","timestamp":"2026-06-25T09:34:00Z","id":"cp_04_code_review","gate":"G3","stage":"review","type":"conditional","trigger":false,"outcome":"skipped","note":"change_triage=yellow, no hotspot"}
+{"event":"artifact_written","timestamp":"2026-06-25T09:37:30Z","stage":"review","agent":"review_agent","artifact":"review_report.json"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:38:00Z","stage":"review","agent":"review_agent"}
+{"event":"stage_started","timestamp":"2026-06-25T09:38:30Z","stage":"qa_validate","agent":"qa_agent"}
+{"event":"checkpoint","timestamp":"2026-06-25T09:39:00Z","id":"cp_05_qa","gate":"G4","stage":"qa_validate","type":"conditional","trigger":false,"outcome":"skipped","note":"branch_coverage>=80, unable_to_execute=0"}
+{"event":"quality_gate_pass","timestamp":"2026-06-25T09:41:30Z","stage":"qa_validate","agent":"qa_agent","feature_id":"feat_login","test_command":"npm test -- auth/login","outcome":"allowed"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:42:00Z","stage":"qa_validate","agent":"qa_agent"}
+{"event":"stage_started","timestamp":"2026-06-25T09:42:30Z","stage":"security","agent":"security_agent"}
+{"event":"checkpoint","timestamp":"2026-06-25T09:43:00Z","id":"cp_06_security","gate":null,"stage":"security","type":"conditional","trigger":false,"outcome":"skipped","note":"no critical/high findings"}
+{"event":"artifact_written","timestamp":"2026-06-25T09:45:30Z","stage":"security","agent":"security_agent","artifact":"security_report.json"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:46:00Z","stage":"security","agent":"security_agent"}
+{"event":"stage_started","timestamp":"2026-06-25T09:46:30Z","stage":"deployment","agent":"devops_agent"}
+{"event":"checkpoint","timestamp":"2026-06-25T09:47:00Z","id":"cp_07_deployment_1pct","gate":null,"stage":"deployment","type":"conditional","trigger":false,"outcome":"skipped","note":"canary metrics green at 1%"}
+{"event":"checkpoint","timestamp":"2026-06-25T09:47:30Z","id":"cp_08_production_promotion","gate":"G6","stage":"deployment","type":"mandatory","trigger":true,"outcome":"approved","note":"production promotion >10% approved by human"}
+{"event":"artifact_written","timestamp":"2026-06-25T09:47:50Z","stage":"deployment","agent":"devops_agent","artifact":"run_summary.json"}
+{"event":"stage_completed","timestamp":"2026-06-25T09:48:00Z","stage":"deployment","agent":"devops_agent"}
+{"event":"run_completed","timestamp":"2026-06-25T09:48:10Z","agent":"orchestrator","outcome":"success"}

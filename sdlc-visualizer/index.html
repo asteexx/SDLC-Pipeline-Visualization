@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SDLC Agent Visualizer — replay</title>
+<style>
+  :root { --bg:#10131a; --panel:#1b2030; --ink:#e8ecf5; --muted:#9aa6c0; --accent:#7CFF9B; --gate:#ffd166; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Segoe UI",system-ui,sans-serif;
+         display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+  header { flex-shrink:0; display:flex; align-items:center; gap:1rem; padding:.6rem 1rem; background:#0b0e15; border-bottom:1px solid #232a3d; }
+  header h1 { font-size:1rem; margin:0; font-weight:600; letter-spacing:.02em; }
+  header .clock { color:var(--muted); font-size:.85rem; }
+  header .sub { color:var(--muted); font-size:.8rem; margin-left:auto; }
+  button { background:var(--panel); color:var(--ink); border:1px solid #2c344a; border-radius:8px;
+           padding:.35rem .8rem; cursor:pointer; font-size:.85rem; }
+  button:hover { border-color:var(--accent); }
+  #fs-btn { margin-left:.5rem; font-size:1rem; padding:.3rem .65rem; }
+  /* When #stage is the fullscreen element, fill the screen and keep the layout */
+  #stage { position:relative; }
+  #stage:fullscreen        { display:flex; width:100vw; height:100vh; background:var(--bg); }
+  #stage:-webkit-full-screen{ display:flex; width:100vw; height:100vh; background:var(--bg); }
+  /* In fullscreen: swap order — action log left, game field right (flush to right edge) */
+  #stage:fullscreen         { flex-direction: row-reverse; }
+  #stage:-webkit-full-screen{ flex-direction: row-reverse; }
+  #stage:fullscreen #game-container         { flex:1; min-width:0; min-height:0; }
+  #stage:-webkit-full-screen #game-container{ flex:1; min-width:0; min-height:0; }
+  /* Action log in fullscreen: wider panel + larger text for big-screen readability */
+  #stage:fullscreen #actionlog,
+  #stage:-webkit-full-screen #actionlog {
+    width: 380px !important; flex-shrink: 0; font-size: 1.05rem;
+  }
+  #stage:fullscreen #actionlog h2,
+  #stage:-webkit-full-screen #actionlog h2          { font-size: 1rem; }
+  #stage:fullscreen #log-now .now-row .ne,
+  #stage:-webkit-full-screen #log-now .now-row .ne  { font-size: 1.4rem; }
+  #stage:fullscreen #log-now .now-row .nn,
+  #stage:-webkit-full-screen #log-now .now-row .nn  { font-size: 1rem; }
+  #stage:fullscreen #log-now .now-row .na,
+  #stage:-webkit-full-screen #log-now .now-row .na  { font-size: .95rem; }
+  #stage:fullscreen #log-now .now-row .nl,
+  #stage:-webkit-full-screen #log-now .now-row .nl  { font-size: .9rem; }
+  #stage:fullscreen #log-feed li,
+  #stage:-webkit-full-screen #log-feed li            { font-size: .92rem; }
+  #stage:fullscreen #log-feed li .fe,
+  #stage:-webkit-full-screen #log-feed li .fe        { font-size: 1.1rem; }
+  /* Floating controls inside the stage — always visible, bottom-left of canvas area */
+  #stage-controls {
+    position:absolute; bottom:1.1rem; left:1.2rem; z-index:30;
+    display:flex; gap:.5rem; align-items:center;
+    background:rgba(11,14,21,.72); border:1px solid #2c344a;
+    border-radius:12px; padding:.45rem .7rem; backdrop-filter:blur(6px);
+    will-change: transform; transform: translateZ(0); /* own GPU layer — renders above WebGL canvas */
+  }
+  #stage-controls button {
+    font-size:1.3rem; padding:.5rem .9rem; border-radius:10px;
+    min-width:3rem; min-height:3rem; line-height:1;
+  }
+  #stage-controls .sc-step {
+    color:var(--muted); font-size:.78rem; padding:0 .3rem; white-space:nowrap;
+  }
+  /* Bigger touch targets at 4K */
+  @media (min-width:2560px) {
+    #stage-controls button { font-size:1.8rem; padding:.7rem 1.2rem; min-width:4.5rem; min-height:4.5rem; }
+    #stage-controls .sc-step { font-size:1rem; }
+    #stage-controls { padding:.6rem 1rem; gap:.7rem; border-radius:16px; }
+  }
+  #metrics { flex-shrink:0; display:flex; flex-wrap:wrap; gap:.4rem; padding:.4rem 1rem;
+             background:#0b0e15; border-bottom:1px solid #232a3d; font-size:.72rem; }
+  #metrics .chip { background:var(--panel); border:1px solid #2c344a; border-radius:6px; padding:.2rem .55rem;
+                   color:var(--muted); white-space:nowrap; }
+  #metrics .chip b { color:var(--accent); font-weight:700; margin-left:.25rem; }
+  #metrics .chip.na b { color:var(--muted); font-weight:600; }
+  #metrics .chip.warn { border-color:var(--gate); }
+  #metrics .chip.warn b { color:var(--gate); }
+  #stage { flex:1; min-height:0; display:flex; }
+  #game-container { flex:1; min-width:0; min-height:0; background:var(--bg); overflow:hidden; }
+  #game-container canvas { display:block; }
+  #actionlog { width:clamp(220px, 22vw, 340px); flex-shrink:0; background:#0b0e15; border-left:1px solid #232a3d;
+               display:flex; flex-direction:column; overflow:hidden; padding:.5rem .65rem; }
+  #actionlog h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:.1rem 0 .5rem; }
+  #log-now { flex-shrink:0; display:flex; flex-direction:column; gap:.3rem; margin-bottom:.5rem;
+             max-height:40%; overflow-y:auto; }
+  #log-now .now-row { background:var(--panel); border:1px solid #2c344a; border-left:3px solid var(--accent);
+                      border-radius:6px; padding:.3rem .45rem; }
+  #log-now .now-row .ne { font-size:1rem; margin-right:.3rem; }
+  #log-now .now-row .nn { font-weight:700; font-size:.78rem; }
+  #log-now .now-row .nm { color:var(--gate); font-size:.7rem; margin-left:.3rem; }
+  #log-now .now-row .na { color:var(--ink); font-size:.74rem; margin-top:.15rem; }
+  #log-now .now-row .nl { color:#bfe3ff; font-size:.7rem; font-style:italic; margin-top:.15rem; }
+  #log-now .now-idle { color:var(--muted); font-size:.74rem; font-style:italic; padding:.2rem; }
+  #log-feed { overflow-y:auto; flex:1; list-style:none; margin:0; padding:0; font-size:.72rem; line-height:1.5; }
+  #log-feed li { color:var(--muted); padding:.12rem 0; border-bottom:1px solid #161b28; }
+  #log-feed li b { color:var(--ink); font-weight:600; }
+  #log-feed li i { color:var(--gate); font-style:normal; }
+  #log-feed li .fe { font-size:.85rem; }
+  #log-feed li .fl { color:#bfe3ff; font-style:italic; padding-left:1.1rem; }
+  #panel { overflow-y:auto; flex-shrink:0; max-height:30vh; }
+  #panel { padding:1rem 1.2rem; }
+  #panel h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:.2rem 0 .8rem; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:.6rem; }
+  .card { background:var(--panel); border:1px solid #2a3148; border-radius:10px; padding:.6rem .7rem; display:flex; gap:.55rem; }
+  .card.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .card.gate { border-color:var(--gate); box-shadow:0 0 0 1px var(--gate) inset; }
+  .card img { width:42px; height:42px; image-rendering:pixelated; border-radius:6px; background:#0e1626; }
+  .card .meta { min-width:0; }
+  .card .nm { font-weight:600; font-size:.85rem; display:flex; gap:.35rem; align-items:center; }
+  .card .em { font-size:1.05rem; }
+  .card .act { font-size:.78rem; color:var(--ink); margin-top:.15rem; }
+  .card .loc { font-size:.74rem; color:var(--muted); }
+  .card .cht { font-size:.72rem; color:#bfe3ff; margin-top:.2rem; font-style:italic; }
+  #loading { padding:2rem; color:var(--muted); }
+  .legend { color:var(--muted); font-size:.72rem; margin-top:1rem; line-height:1.6; }
+  code { color:#bfe3ff; }
+
+  /* Large interactive panels (e.g. NewLine 75" 4K touch displays) — the Phaser canvas auto-scales,
+     but the rem-based HTML chrome does not. Scale it up for distance legibility + bigger touch
+     targets. Gated to very wide viewports so normal laptop/1080p layouts are untouched. */
+  @media (min-width: 2560px) {
+    html { font-size: 22px; }
+    #actionlog { width: clamp(360px, 16vw, 600px); }
+    button { padding: .5rem 1.1rem; }
+    .card img { width: 56px; height: 56px; }
+  }
+  @media (min-width: 3400px) {
+    html { font-size: 28px; }
+  }
+
+  /* ── Start overlay ── */
+  #start-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(10,13,20,.96);
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(10px);
+  }
+  #start-overlay .sov-card {
+    display: flex; flex-direction: column; align-items: center;
+    gap: clamp(1.2rem, 3vh, 2.5rem); text-align: center;
+    padding: clamp(2rem, 5vw, 6rem);
+    background: #161b2a; border: 1px solid #2c344a;
+    border-radius: 24px;
+    box-shadow: 0 0 80px rgba(124,255,155,.08);
+  }
+  #start-overlay .sov-logo  { font-size: clamp(2rem, 5vw, 4rem); }
+  #start-overlay .sov-title { font-size: clamp(1.2rem, 3vw, 2.4rem); font-weight: 700; letter-spacing: .03em; }
+  #start-overlay .sov-sub   { color: var(--muted); font-size: clamp(.85rem, 1.8vw, 1.4rem); max-width: 36rem; line-height: 1.5; }
+  #start-btn {
+    margin-top: .5rem;
+    font-size: clamp(1.2rem, 3vw, 2rem); font-weight: 700; letter-spacing: .06em;
+    padding: clamp(.9rem, 2.5vh, 1.6rem) clamp(3rem, 8vw, 7rem);
+    background: var(--accent); color: #071410;
+    border: none; border-radius: 16px; cursor: pointer;
+    box-shadow: 0 0 48px rgba(124,255,155,.35);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  #start-btn:hover, #start-btn:focus { outline: none; transform: scale(1.04); box-shadow: 0 0 72px rgba(124,255,155,.55); }
+  #start-btn:active { transform: scale(.97); }
+</style>
+</head>
+<body>
+
+<div id="start-overlay">
+  <div class="sov-card">
+    <div class="sov-logo">🛠️</div>
+    <div class="sov-title">SDLC Agent Visualizer</div>
+    <div class="sov-sub" id="sov-run-label">Loading…</div>
+    <button id="start-btn">▶ Start</button>
+  </div>
+</div>
+
+<header>
+  <h1>🛠️ SDLC Agent Visualizer</h1>
+  <span class="clock" id="game-time-content"></span>
+  <button id="play_button">▶ Play</button>
+  <button id="pause_button">⏸ Pause</button>
+  <button id="fs-btn" title="Fullscreen stage">⛶</button>
+  <button id="mute-btn" title="Toggle music" style="font-size:.9rem;padding:.3rem .65rem;">🔊</button>
+  <span class="sub" id="run-label"></span>
+</header>
+<audio id="bg-music" src="music.mp3" preload="auto"></audio>
+
+<div id="metrics"></div>
+
+<div id="stage">
+  <div id="game-container"></div>
+  <aside id="actionlog">
+    <h2>Action Log</h2>
+    <div id="log-now"></div>
+    <ol id="log-feed"></ol>
+  </aside>
+</div>
+
+<div id="panel">
+  <h2>Agents</h2>
+  <div class="grid" id="agent-grid"></div>
+  <div class="legend" id="legend"></div>
+</div>
+
+<div id="temp_focus" style="display:none"></div>
+<div id="loading">Loading run…</div>
+
+<script src="assets/vendor/phaser.min.js"></script>
+<script>
+"use strict";
+
+// Which run to replay (?run=sample_run). Default: sample_run.
+const RUN = new URLSearchParams(location.search).get("run") || "sample_run";
+const PLAY_SPEED = 4;            // px/frame; must divide tile_width (32) evenly (lower = smoother/slower)
+const TILE_WIDTH = 40;   // 1.25× base tile (rooms 25% larger; camera anchored to 32px reference)
+
+let meta, world, all_movement, tileset;
+let persona_init_pos = {};        // Underscore_Name -> [tileX, tileY]
+let display_to_under = {};        // "Display Name" -> Underscore_Name
+let under_to_display = {};
+const bgMusic = document.getElementById('bg-music');
+
+async function boot() {
+  [world, meta, all_movement, tileset] = await Promise.all([
+    fetch("config/pipeline_world.json").then(r => r.json()),
+    fetch(`data/${RUN}/meta.json`).then(r => r.json()),
+    fetch(`data/${RUN}/master_movement.json`).then(r => r.json()),
+    fetch("config/tileset.json").then(r => r.json()),
+  ]);
+
+  document.getElementById("run-label").textContent =
+    `run: ${RUN} · ${meta.step} steps · ${meta.persona_names.length} agents`;
+
+  // Build name maps + initial positions from step "0".
+  const step0 = all_movement["0"];
+  for (const display of Object.keys(step0)) {
+    const under = display.replaceAll(" ", "_");
+    display_to_under[display] = under;
+    under_to_display[under] = display;
+    persona_init_pos[under] = step0[display].movement;
+  }
+
+  buildPanels();
+  buildLegend();
+  buildMetricsHud();
+  document.getElementById("loading").style.display = "none";
+
+  // Update start-overlay subtitle with run info (available now that meta is loaded)
+  const sovLabel = document.getElementById("sov-run-label");
+  if (sovLabel) sovLabel.textContent =
+    (meta.product || RUN) + " · " + meta.step + " steps · " + meta.persona_names.length + " agents";
+
+
+  window.__game = new Phaser.Game(config);
+}
+
+function buildPanels() {
+  const grid = document.getElementById("agent-grid");
+  for (const display of meta.persona_names) {
+    const under = display.replaceAll(" ", "_");
+    const card = document.createElement("div");
+    card.className = "card";
+    card.id = "card-" + under;
+    card.innerHTML = `
+      <img src="assets/characters/profile/${under}.png" onerror="this.style.visibility='hidden'">
+      <div class="meta">
+        <div class="nm">${display} <span class="em" id="quick_emoji-${under}"></span></div>
+        <div class="act" id="current_action__${under}"></div>
+        <div class="loc" id="target_address__${under}"></div>
+        <div class="cht" id="chat__${under}"></div>
+      </div>`;
+    grid.appendChild(card);
+  }
+}
+
+function buildLegend() {
+  const r = Object.entries(world.rooms)
+    .filter(([k]) => world.phases[k])
+    .map(([k, v]) => `<code>${v.label}</code>`).join(" · ");
+  document.getElementById("legend").innerHTML =
+    `Rooms (left→right by phase): ${r}.<br>` +
+    `▶ watch each agent walk to its phase-room, hand off at the hub, pause at the mandatory gates (G1, G6), ` +
+    `and recover from a failed quality gate in the Dev Room.`;
+}
+
+// Action Log — live feed of "who is doing what", driven from each step's agent descriptions.
+const __logNow = {};      // u -> { pron, name, action, mode, idle }
+let   __logFeed = [];     // [{ pron, name, action, mode }]
+const __logLast = {};     // u -> last "action|mode" (dedupe)
+function logRecord(u, name, pron, desc, mode, chat) {
+  const action = ((desc || "").split("@")[0] || "").trim();
+  const idle = action === "" || /^Idle/.test(action);
+  let line = (chat && chat.length) ? chat.map(c => c[1]).join(" · ") : "";
+  if (line.length > 72) line = line.slice(0, 72) + "…";
+  __logNow[u] = { pron, name, action, mode, idle, line };
+  const k = action + "|" + (mode || "") + "|" + line;
+  if (!idle && __logLast[u] !== k) {
+    __logFeed.push({ pron, name, action, mode, line });
+    if (__logFeed.length > 80) __logFeed.shift();
+  }
+  __logLast[u] = k;
+}
+function renderActionLog() {
+  const nowEl = document.getElementById("log-now"), feedEl = document.getElementById("log-feed");
+  if (!nowEl || !feedEl) return;
+  const esc = (s) => (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const active = Object.values(__logNow).filter(s => !s.idle);
+  nowEl.innerHTML = active.length
+    ? active.map(s => `<div class="now-row"><span class="ne">${s.pron}</span><span class="nn">${esc(s.name)}</span>` +
+        `${s.mode ? `<span class="nm">«${esc(s.mode)}»</span>` : ""}<div class="na">${esc(s.action)}</div>` +
+        `${s.line ? `<div class="nl">“${esc(s.line)}”</div>` : ""}</div>`).join("")
+    : `<div class="now-idle">All agents idle</div>`;
+  feedEl.innerHTML = __logFeed.slice(-50).reverse().map(e =>
+    `<li><span class="fe">${e.pron}</span> <b>${esc(e.name)}</b> — ${esc(e.action)}` +
+    `${e.mode ? ` <i>«${esc(e.mode)}»</i>` : ""}` +
+    `${e.line ? `<div class="fl">“${esc(e.line)}”</div>` : ""}</li>`).join("");
+}
+
+// M9/M10 — honest metrics HUD from meta.summary (computed by convert_run.mjs; null => "N/A — no data").
+function buildMetricsHud() {
+  const el = document.getElementById("metrics"); if (!el) return;
+  const s = meta.summary; if (!s) { el.style.display = "none"; return; }
+  const chip = (label, val, cls = "") => `<span class="chip ${cls}">${label}<b>${val}</b></span>`;
+  const out = [];
+  // Clean-run (steady-state) autonomy — falls back to the computed rate for runs without the field.
+  const cra = s.clean_run_autonomy_pct != null ? s.clean_run_autonomy_pct : s.autonomy_rate_pct;
+  out.push(chip("Clean-run autonomy", cra != null ? cra + "%" : "N/A", cra == null ? "na" : ""));
+  out.push(chip("Mandatory human gates", s.mandatory_gates != null ? s.mandatory_gates : "N/A",
+                s.mandatory_gates == null ? "na" : ""));
+  el.innerHTML = out.join("");
+}
+
+// ###########################################################################
+// PHASER ENGINE  (ported from gen-agents demo/main_script.html)
+// ###########################################################################
+let step = 0;
+let step_size = (meta_sec()) * 1000;
+function meta_sec() { return 10; }   // resolved after boot via meta; kept simple
+
+const config = {
+  type: Phaser.AUTO,
+  width: 1920,
+  height: 900,
+  parent: "game-container",
+  pixelArt: true,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 1920,
+    height: 900,
+  },
+  physics: { default: "arcade", arcade: { gravity: { y: 0 } } },
+  scene: { preload: preload, create: create, update: update },
+};
+
+let cursors, player;
+let personas = {}, pronunciatios = {}, speech_bubbles = {}, nametags = {}, chat_texts = {};
+let agent_abbrs = {};
+let anims_direction, pre_anims_direction, pre_anims_direction_dict = {};
+let movement_speed = PLAY_SPEED;
+let execute_count_max = TILE_WIDTH / movement_speed;
+let execute_count = execute_count_max;
+let movement_target = {};
+let spawn_tile_loc = {};
+let archiveDocs = [];   // { text, step } — doc icons revealed when an unused artifact is filed
+let jobDone = false, jobDoneTimer = 0, jobDoneOverlay = null;
+let start_datetime;
+const datetime_options = { weekday:"long", year:"numeric", month:"long", day:"numeric" };
+
+function preload() {
+  step_size = meta.sec_per_step * 1000;
+  start_datetime = new Date(Date.parse(meta.start_date + " 00:00:00"));
+  document.getElementById("game-time-content").textContent =
+    start_datetime.toLocaleString("en-US", datetime_options);
+
+  for (const u in persona_init_pos) spawn_tile_loc[u] = persona_init_pos[u];
+
+  // M4: rooms are tiled from the LimeZu Room Builder sheet (see config/tileset.json).
+  this.load.spritesheet("roombuilder", tileset.sheet,
+    { frameWidth: tileset.tile, frameHeight: tileset.tile });
+  if (tileset.furniture) {
+    this.load.spritesheet("interiors", tileset.furniture.sheet,
+      { frameWidth: tileset.tile, frameHeight: tileset.tile });
+  }
+  for (const u in persona_init_pos) {
+    this.load.atlas(u, `assets/characters/${u}.png`, "assets/characters/atlas.json");
+  }
+  this.load.atlas("atlas", "assets/characters/Human_Lead.png", "assets/characters/atlas.json"); // camera anchor
+  this.load.image("speech_bubble", "assets/speech_bubble/v3.png");
+}
+
+// office floor-plan palette – warm wood / "Sims-style" interior tones
+const ZONE = {
+  top:  { floor: 0xd8c8a0, plank: 0xb8a870, rug: 0x2a5890, border: 0x8a6a3a },
+  bot:  { floor: 0xc8b888, plank: 0xa89858, rug: 0x2a6040, border: 0x7a5a28 },
+  hub:  { floor: 0xc89040, plank: 0xa07020, rug: 0xd09018, border: 0xe8c050 },
+  gate: { floor: 0xd0a080, plank: 0xb07860, rug: 0xb83870, border: 0xe07898 },
+};
+const WALL = 0x3a2008;
+const WALL_TRIM = 0x7a4820;
+const DOOR_W = 2;
+
+// ── 3-D drawing helpers ──────────────────────────────────────────────────────
+function drawFloorPlanks(g, rx, ry, rw, rh, baseColor, plankColor) {
+  g.fillStyle(baseColor, 1).fillRect(rx, ry, rw, rh);
+  g.lineStyle(1, plankColor, 0.38);
+  const PH = 18;
+  for (let py = ry + PH; py < ry + rh; py += PH) g.lineBetween(rx + 2, py, rx + rw - 2, py);
+  let off = 0;
+  for (let px = rx + 80; px < rx + rw - 8; px += 80, off ^= 1)
+    g.lineBetween(px, ry + off * PH, px, ry + rh - off * PH);
+}
+
+function draw3DBox(g, x, y, w, h, topColor, frontColor) {
+  const fh = Math.max(4, Math.round(h * 0.35));
+  g.fillStyle(0x000000, 0.18).fillRect(x + 3, y + 3, w, h);
+  g.fillStyle(topColor, 1).fillRect(x, y, w, h - fh);
+  g.fillStyle(frontColor, 1).fillRect(x, y + h - fh, w, fh);
+  g.fillStyle(0x000000, 0.12).fillRect(x + w - 3, y, 3, h);
+}
+
+function drawRug(g, cx, cy, w, h, color) {
+  g.fillStyle(color, 0.38).fillRect(cx - w/2, cy - h/2, w, h);
+  g.lineStyle(4, color, 0.65).strokeRect(cx - w/2 + 7, cy - h/2 + 7, w - 14, h - 14);
+  g.lineStyle(1, 0xffffff, 0.18).strokeRect(cx - w/2 + 3, cy - h/2 + 3, w - 6, h - 6);
+}
+
+function drawChair(g, cx, cy, r, color) {
+  g.fillStyle(0x000000, 0.18).fillCircle(cx + 2, cy + 2, r);
+  g.fillStyle(color, 1).fillCircle(cx, cy, r);
+  g.fillStyle(0xffffff, 0.22).fillCircle(cx - r*0.35, cy - r*0.35, r * 0.38);
+}
+
+// per-room themed furniture with 3-D depth
+function drawFurniture(g, key, rm, rx, ry, rw, rh) {
+  const S = TILE_WIDTH / 32;
+  const sp = v => Math.round(v * S);
+  const cx = rx + rw / 2;
+  const woodTop = 0xa87848, woodFront = 0x6a4018;
+  const metalTop = 0xb0bac8, metalFront = 0x606a7a;
+  const screen = 0x18d8c8, gold = 0xffcf40, goldDark = 0xb09020;
+  const row = rm.zone === "bot" ? ry + rh - sp(95) : ry + sp(60);
+
+  const desk = (x) => {
+    draw3DBox(g, x, row, sp(68), sp(22), woodTop, woodFront);
+    draw3DBox(g, x + sp(18), row - sp(16), sp(28), sp(15), 0x1a2030, 0x10161e);
+    g.fillStyle(screen, 1).fillRect(x + sp(19), row - sp(15), sp(25), sp(12));
+    g.fillStyle(0x80ffe8, 0.35).fillRect(x + sp(20), row - sp(14), sp(10), sp(5));
+  };
+
+  switch (key) {
+    case "requirements": {
+      drawRug(g, cx, row - sp(10), sp(185), sp(82), 0x2a5890);
+      draw3DBox(g, cx - sp(80), ry + sp(12), sp(160), sp(44), 0xf0ece4, 0xd8d4cc);
+      g.lineStyle(1, 0xb0b8cc, 0.5).lineBetween(cx - sp(60), ry + sp(12), cx - sp(60), ry + sp(56));
+      g.lineBetween(cx + sp(60), ry + sp(12), cx + sp(60), ry + sp(56));
+      [[gold, cx-sp(62)],[0x7cff9b, cx-sp(22)],[0x6aaeff, cx+sp(18)]].forEach(([c, sx]) => {
+        g.fillStyle(0x000000, 0.15).fillRect(sx+sp(2), row-sp(32), sp(32), sp(26));
+        g.fillStyle(c, 1).fillRect(sx, row-sp(34), sp(32), sp(26));
+        g.lineStyle(1, 0x000000, 0.12).lineBetween(sx+sp(4), row-sp(27), sx+sp(28), row-sp(27));
+        g.lineBetween(sx+sp(4), row-sp(21), sx+sp(28), row-sp(21));
+      });
+      desk(cx - sp(36)); break;
+    }
+    case "planning": {
+      drawRug(g, cx, row - sp(10), sp(195), sp(85), 0x2a6040);
+      draw3DBox(g, cx - sp(90), ry + sp(10), sp(180), sp(52), 0x1a2840, 0x0e1a2c);
+      ['Todo','Doing','Done'].forEach((_, i) => {
+        const bx = cx - sp(82) + i * sp(60);
+        g.fillStyle([0xe05050, gold, 0x50c050][i], 0.65).fillRect(bx, ry + sp(14), sp(52), sp(8));
+        g.fillStyle([0xe05050, gold, 0x50c050][i], 0.85);
+        g.fillRect(bx + sp(2), ry + sp(26), sp(48), sp(10)); g.fillRect(bx + sp(2), ry + sp(40), sp(48), sp(10));
+      });
+      desk(cx - sp(36)); break;
+    }
+    case "design": {
+      drawRug(g, cx, row - sp(10), sp(195), sp(85), 0x1a3060);
+      draw3DBox(g, cx - sp(80), row - sp(26), sp(160), sp(52), 0x1a3d6e, 0x10284a);
+      g.lineStyle(1, 0x80b8f8, 0.45);
+      for (let i = 1; i < 7; i++) g.lineBetween(cx-sp(80), row-sp(26)+i*sp(7), cx+sp(80), row-sp(26)+i*sp(7));
+      for (let i = 1; i < 10; i++) g.lineBetween(cx-sp(80)+i*sp(16), row-sp(26), cx-sp(80)+i*sp(16), row+sp(26));
+      g.fillStyle(gold, 0.8).fillRect(cx-sp(5), row-sp(1), sp(10), sp(10));
+      g.lineStyle(2, 0xffffff, 0.6).lineBetween(cx-sp(20), row+sp(4), cx+sp(20), row+sp(4));
+      g.lineBetween(cx, row-sp(16), cx, row+sp(24));
+      desk(cx - sp(36)); break;
+    }
+    case "qa_generate": case "qa_validate": {
+      drawRug(g, cx, row - sp(10), sp(185), sp(82), 0x2a6040);
+      draw3DBox(g, cx - sp(92), row - sp(10), sp(82), sp(28), woodTop, woodFront);
+      draw3DBox(g, cx + sp(10), row - sp(10), sp(82), sp(28), woodTop, woodFront);
+      [[cx-sp(70), 0x50ff90],[cx-sp(50), 0x40d8ff],[cx-sp(28), 0xffcc40]].forEach(([fx, fc]) => {
+        g.fillStyle(fc, 0.8).fillTriangle(fx-sp(8), row-sp(16), fx+sp(8), row-sp(16), fx, row-sp(30));
+        g.fillStyle(fc, 0.5).fillRect(fx-sp(4), row-sp(10), sp(8), sp(8));
+        g.fillStyle(0x909090, 1).fillRect(fx-sp(3), row-sp(28), sp(6), sp(4));
+      });
+      [[cx+sp(32), 0xcc80ff],[cx+sp(56), 0x80ffcc]].forEach(([fx, fc]) => {
+        g.fillStyle(fc, 0.8).fillTriangle(fx-sp(7), row-sp(14), fx+sp(7), row-sp(14), fx, row-sp(26));
+        g.fillStyle(fc, 0.5).fillRect(fx-sp(3), row-sp(8), sp(6), sp(6));
+      });
+      desk(cx - sp(36)); break;
+    }
+    case "implementation": {
+      drawRug(g, cx, row - sp(10), sp(225), sp(90), 0x203070);
+      desk(cx - sp(92)); desk(cx - sp(14)); desk(cx + sp(64)); break;
+    }
+    case "review": {
+      drawRug(g, cx, row - sp(10), sp(185), sp(82), 0x2a6040);
+      desk(cx - sp(44));
+      g.fillStyle(0x000000, 0.2).fillCircle(cx+sp(52), row-sp(4), sp(20));
+      g.lineStyle(7, goldDark, 1).strokeCircle(cx+sp(50), row-sp(6), sp(18));
+      g.lineStyle(5, gold, 1).strokeCircle(cx+sp(50), row-sp(6), sp(18));
+      g.fillStyle(0x90d8ff, 0.28).fillCircle(cx+sp(50), row-sp(6), sp(16));
+      g.lineStyle(6, woodFront, 1).lineBetween(cx+sp(63), row+sp(7), cx+sp(80), row+sp(26));
+      g.lineStyle(4, woodTop, 1).lineBetween(cx+sp(63), row+sp(7), cx+sp(80), row+sp(26)); break;
+    }
+    case "security": {
+      drawRug(g, cx, row - sp(14), sp(165), sp(82), 0x301828);
+      draw3DBox(g, cx - sp(32), row - sp(20), sp(64), sp(58), 0x404858, 0x282e38);
+      g.fillStyle(0x000000, 0.22).fillCircle(cx+sp(2), row+sp(10), sp(28));
+      g.fillStyle(0x606878, 1).fillCircle(cx, row+sp(8), sp(22));
+      g.lineStyle(4, gold, 1).strokeCircle(cx, row+sp(8), sp(22));
+      g.lineStyle(2, gold, 0.55);
+      for (let a = 0; a < 6; a++) {
+        const ang = a * Math.PI / 3;
+        g.lineBetween(cx+Math.cos(ang)*sp(12), row+sp(8)+Math.sin(ang)*sp(12), cx+Math.cos(ang)*sp(20), row+sp(8)+Math.sin(ang)*sp(20));
+      }
+      g.fillStyle(goldDark, 1).fillCircle(cx, row+sp(8), sp(7));
+      g.fillStyle(gold, 1).fillCircle(cx-sp(2), row+sp(6), sp(4)); break;
+    }
+    case "deployment": {
+      drawRug(g, cx, row - sp(14), sp(225), sp(90), 0x182840);
+      for (let i = 0; i < 3; i++) {
+        const sx = cx - sp(82) + i * sp(56);
+        draw3DBox(g, sx, row - sp(22), sp(44), sp(62), metalTop, metalFront);
+        for (let j = 0; j < 5; j++) {
+          g.fillStyle(0x20e878, j < 3 ? 1 : 0.4).fillRect(sx+sp(6), row-sp(16)+j*sp(10), sp(8), sp(6));
+          g.fillStyle(0x808a9a, 1).fillRect(sx+sp(18), row-sp(16)+j*sp(10), sp(22), sp(6));
+        }
+      } break;
+    }
+    case "archive": {
+      drawRug(g, cx, ry + rh/2, rw - sp(38), rh - sp(36), 0x402a18);
+      const booksTop = [0xb08060, 0x8a5840, 0xc09a60, 0x7a4830, 0xd0b080];
+      const booksFront = [0x785038, 0x5a3820, 0x907a40, 0x4a2810, 0xa07850];
+      for (let r = 0; r < 3; r++) {
+        draw3DBox(g, rx+sp(18), ry+sp(48)+r*sp(44), rw-sp(36), sp(12), woodTop, woodFront);
+        const bw = Math.floor((rw - sp(58)) / 5);
+        for (let b = 0; b < 5; b++)
+          draw3DBox(g, rx+sp(24)+b*bw, ry+sp(28)+r*sp(44), bw-sp(4), sp(20), booksTop[b], booksFront[b]);
+      } break;
+    }
+    default: {
+      drawRug(g, cx, row - sp(10), sp(165), sp(72), 0x3a5a7a);
+      desk(cx - sp(36)); break;
+    }
+  }
+}
+
+function create() {
+  // Reset run-state so scene.restart() works as a clean replay
+  step = 0; jobDone = false; jobDoneTimer = 0; jobDoneOverlay = null; archiveDocs = [];
+  personas = {}; pronunciatios = {}; speech_bubbles = {}; nametags = {}; chat_texts = {}; agent_abbrs = {};
+  pre_anims_direction_dict = {}; movement_target = {};
+
+  const TW = TILE_WIDTH;
+  const MW = world.map.width, MH = world.map.height;
+  const W = MW * TW, H = MH * TW;
+
+  // --- exterior grass (procedural, cheap) ---
+  const g = this.add.graphics().setDepth(0);
+  g.fillStyle(0x2d6a1f, 1).fillRect(0, 0, W, H);
+  g.fillStyle(0x245414, 1);
+  for (let gx = 12; gx < W - 8; gx += 22) for (let gy = 8; gy < H - 8; gy += 20) g.fillRect(gx, gy, 4, 3);
+  g.fillStyle(0x388a24, 1);
+  for (let gx = 5; gx < W; gx += 22) for (let gy = 14; gy < H; gy += 20) g.fillRect(gx, gy, 3, 3);
+
+  // --- tiled floors + walls from the Room Builder sheet (matches tools/render_map.py) ---
+  const SHEET_COLS = Math.floor(this.textures.get("roombuilder").getSourceImage().width / tileset.tile);
+  const frameOf = (coord) => coord[1] * SHEET_COLS + coord[0];
+  const floorCoord = (name) => tileset.floors[name];
+  const roomFloor = (key) => floorCoord(tileset.room_floor[key] || "tile_grey");
+  const DOOR_W = 2;
+
+  const rt = this.add.renderTexture(0, 0, W, H).setOrigin(0, 0).setDepth(0);
+  const tmp = this.make.image({ key: "roombuilder", frame: 0, add: false }).setOrigin(0, 0);
+  tmp.setDisplaySize(TW, TW);
+  const stamp = (tx, ty, coord) => { tmp.setFrame(frameOf(coord)); rt.draw(tmp, tx * TW, ty * TW); };
+  const fillTiles = (x, y, w, h, coord) => {
+    for (let ty = y; ty < y + h; ty++)
+      for (let tx = x; tx < x + w; tx++)
+        if (tx >= 0 && tx < MW && ty >= 0 && ty < MH) stamp(tx, ty, coord);
+  };
+
+  // building interior corridor floor
+  fillTiles(1, 1, MW - 2, MH - 2, floorCoord(tileset.room_floor.corridor || "tile_grey"));
+
+  // per-room floors
+  for (const key in world.rooms) {
+    const rm = world.rooms[key]; if (!rm.rect) continue;
+    const [x, y, w, h] = rm.rect;
+    fillTiles(x, y, w, h, roomFloor(key));
+  }
+
+  // walls (top/bot zones): 1-tile ring with a door gap centred on the anchor column
+  const wallCoord = tileset.wall.fill;
+  for (const key in world.rooms) {
+    const rm = world.rooms[key]; if (!rm.rect || (rm.zone !== "top" && rm.zone !== "bot")) continue;
+    const [x, y, w, h] = rm.rect;
+    const doorC = rm.anchor[0];
+    const doorCols = new Set();
+    for (let i = 0; i < DOOR_W; i++) doorCols.add(doorC - Math.floor(DOOR_W / 2) + i);
+    const doorTop = rm.zone === "bot";  // bot rooms: door on TOP edge; top rooms: door on BOTTOM edge
+    for (let tx = x; tx < x + w; tx++) {
+      if (!(doorCols.has(tx) && doorTop)) stamp(tx, y, wallCoord);
+      if (!(doorCols.has(tx) && !doorTop)) stamp(tx, y + h - 1, wallCoord);
+    }
+    for (let ty = y; ty < y + h; ty++) { stamp(x, ty, wallCoord); stamp(x + w - 1, ty, wallCoord); }
+  }
+  tmp.destroy();
+
+  // --- furniture + wall shadows (drawn ABOVE the tile floor) ---
+  const g2 = this.add.graphics().setDepth(0);
+
+  for (const key in world.rooms) {
+    const rm = world.rooms[key]; if (!rm.rect) continue;
+    const [rx, ry, rw, rh] = rm.rect.map((v) => v * TW);
+    const walled = rm.zone === "top" || rm.zone === "bot";
+
+    // 3D depth: thin dark shadow cast by the walls onto the interior floor
+    if (walled) {
+      const sh = Math.max(3, Math.round(TW / 10)), T = TW;
+      g2.fillStyle(0x000000, 0.27).fillRect(rx + T, ry + T, rw - 2 * T, sh);   // under top wall
+      g2.fillStyle(0x000000, 0.16).fillRect(rx + T, ry + T, sh, rh - 2 * T);   // left wall
+      g2.fillStyle(0x000000, 0.16).fillRect(rx + rw - T - sh, ry + T, sh, rh - 2 * T); // right wall
+    }
+
+    drawFurniture(g2, key, rm, rx, ry, rw, rh);
+    if (world.phases[key]) {
+      this.add.text(rx + rw / 2, ry + rh / 2 + 4, world.phases[key].pronunciatio,
+        { font: "64px monospace" }).setOrigin(0.5).setAlpha(0.10).setDepth(0);
+    }
+
+    // room label — a nameplate INSIDE the room, on the wall opposite the door (clear of agent entry)
+    const labelTxt = (world.phases[key] ? world.phases[key].pronunciatio + '  ' : '') + rm.label;
+    const inset = Math.round(TW * 0.78);
+    const ly = (rm.zone === "bot") ? ry + rh - inset : ry + inset;   // bot door is on top -> label at bottom
+    const label = this.add.text(rx + rw / 2, ly, labelTxt, {
+      font: 'bold 26px monospace', fill: '#ffffff', stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5, 0.5).setDepth(1);
+    // semi-transparent plate behind the text for contrast over the textured floor
+    const padX = 9, padY = 3;
+    g2.fillStyle(0x0b0e15, 0.6).fillRoundedRect(
+      label.x - label.width / 2 - padX, label.y - label.height / 2 - padY,
+      label.width + padX * 2, label.height + padY * 2, 6);
+
+    // order badge — stays inside the room, on the wall opposite the door
+    const ord = (world.flow || []).indexOf(key);
+    if (ord >= 0) {
+      const z = ZONE[rm.zone] || ZONE.top;
+      const badgeY = rm.zone === "bot" ? ry + rh - 22 : ry + 22;
+      g2.fillStyle(z.border, 1).fillCircle(rx + rw - 22, badgeY, 16);
+      this.add.text(rx + rw - 28, badgeY - 12, String(ord + 1),
+        { font: 'bold 20px monospace', fill: '#0e1118' }).setDepth(3);
+    }
+  }
+
+  // --- tile-art furniture (interiors_pt1; placement MUST match tools/render_map.py) ---
+  const furn = tileset.furniture;
+  if (furn) {
+    const FCOLS = Math.floor(this.textures.get("interiors").getSourceImage().width / tileset.tile);
+    const placeFurn = (name, tx, ty) => {
+      const [c, r, fw, fh] = furn.items[name];
+      for (let dy = 0; dy < fh; dy++) for (let dx = 0; dx < fw; dx++)
+        this.add.image((tx + dx) * TW, (ty + dy) * TW, "interiors", (r + dy) * FCOLS + (c + dx))
+          .setOrigin(0, 0).setDisplaySize(TW, TW).setDepth(1);
+    };
+    // placement MUST match placements() in tools/render_map.py
+    const furniturePlacements = (key, x, y, w, h) => {
+      if (key === "archive")
+        return [["bookshelf", x+1, y+1], ["bookshelf", x+3, y+1], ["bookshelf", x+5, y+1],
+                ["plant_tree", x+w-2, y+h-3]];
+      if (key === "orchestrator_hub")
+        return [["couch", x+1, y+1], ["stool", x+5, y+1],
+                ["chair", x+1, y+h-3], ["plant_tree", x+w-2, y+h-3]];
+      if (key === "checkpoint_gate")
+        return [["couch", x+1, y+1],
+                ["chair", x+1, y+h-3], ["plant_tree", x+w-2, y+h-3]];
+      return [["chair", x+1, y+h-3], ["plant_tree", x+w-2, y+h-3]];
+    };
+    for (const key in world.rooms) {
+      const rm = world.rooms[key]; if (!rm.rect) continue;
+      const [x, y, w, h] = rm.rect;
+      for (const [name, tx, ty] of furniturePlacements(key, x, y, w, h)) placeFurn(name, tx, ty);
+    }
+  }
+
+  // camera: fit the whole office, centered (arrow keys still pan)
+  player = this.physics.add.sprite(W / 2, H / 2, "atlas", "down").setSize(30, 40).setOffset(0, 0);
+  player.setDepth(-1); player.visible = false;
+  const camera = this.cameras.main;
+  camera.startFollow(player);   // player sits at world centre -> office is centred; arrows pan
+  camera.setZoom(Math.min(config.width / W, config.height / H) * 0.98);
+  cursors = this.input.keyboard.createCursorKeys();
+
+  // pre-create the archive doc icons (revealed in update() as artifacts are filed)
+  archiveDocs = [];
+  if (meta.archive_drops && world.rooms.archive) {
+    const ar = world.rooms.archive.rect;
+    meta.archive_drops.forEach((dropStep, i) => {
+      const col = i % 5, rowN = Math.floor(i / 5);
+      const dx = (ar[0] + 1.5 + col * 1.3) * TW, dy = (ar[1] + 2.4 + rowN * 2.6) * TW;
+      const t = this.add.text(dx, dy, "📄", { font: "22px monospace" }).setDepth(2).setAlpha(0);
+      archiveDocs.push({ t, step: dropStep });
+    });
+  }
+
+  for (let i = 0; i < Object.keys(spawn_tile_loc).length; i++) {
+    const u = Object.keys(spawn_tile_loc)[i];
+    const start_pos = [spawn_tile_loc[u][0] * TILE_WIDTH + TILE_WIDTH / 2,
+                       spawn_tile_loc[u][1] * TILE_WIDTH + TILE_WIDTH];
+    const s = this.physics.add.sprite(start_pos[0], start_pos[1], u, "down").setSize(30, 40).setOffset(0, 0);
+    s.displayWidth = 72; s.scaleY = s.scaleX; s.setDepth(2);
+    personas[u] = s;
+
+    // combined emoji + abbreviated name — bottom-centered above the sprite head.
+    // Use s.x (sprite center) not body.x — body is offset by frame-half (16px) from sprite center.
+    const abbr = under_to_display[u].split(' ').slice(0, 2).join(' ').slice(0, 8).toUpperCase();
+    agent_abbrs[u] = abbr;
+    pronunciatios[u] = this.add.text(start_pos[0], start_pos[1] - s.displayHeight * 0.5 - 6, '💤\n' + abbr, {
+      font: 'bold 26px monospace', fill: '#ffffff',
+      stroke: '#000000', strokeThickness: 5, align: 'center',
+    }).setOrigin(0.5, 1).setDepth(6);
+
+    nametags[u] = null;   // merged into pronunciatios — kept as placeholder so update() references don't throw
+
+    // speech bubble — centred on sprite x, above the label.
+    chat_texts[u] = this.add.text(s.x, s.y - s.displayHeight * 0.5 - 72, '', {
+      font: 'bold 22px monospace', color: '#0a1428',
+      backgroundColor: '#ffffff', padding: { x: 9, y: 7 },
+      align: 'center', wordWrap: { width: 260 },
+    }).setOrigin(0.5, 1).setDepth(7).setVisible(false);
+    speech_bubbles[u] = chat_texts[u];   // alias so legacy show/hide refs drive the text-plate bubble
+  }
+
+  const anims = this.anims;
+  for (const u in persona_init_pos) {
+    for (const dir of ["left", "right", "down", "up"]) {
+      anims.create({
+        key: u + "-" + dir + "-walk",
+        frames: anims.generateFrameNames(u, { prefix: dir + "-walk.", start: 0, end: 3, zeroPad: 3 }),
+        frameRate: 8, repeat: -1,
+      });
+    }
+  }
+
+  // Play/Pause controls — wired once here, not per-frame in update()
+  const scPlay = document.getElementById("sc-play");
+  const scPause = document.getElementById("sc-pause");
+  if (scPlay) scPlay.onclick = () => this.scene.resume();
+  if (scPause) scPause.onclick = () => this.scene.pause();
+  document.getElementById("play_button").onclick   = () => {
+    this.scene.resume();
+    if (!bgMusic.ended && bgMusic.currentTime > 0) bgMusic.play().catch(() => {});
+  };
+  document.getElementById("pause_button").onclick  = () => {
+    this.scene.pause();
+    bgMusic.pause();
+  };
+
+  // Fullscreen toggle — wired once in create() so no per-frame listener accumulation.
+  const fsBtn   = document.getElementById("fs-btn");
+  const fsStage = document.getElementById("stage");
+  const scaleRef = this.scale;
+  const syncFsBtn = () => {
+    const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    fsBtn.textContent = inFs ? "✕" : "⛶";
+    fsBtn.title = inFs ? "Exit fullscreen" : "Fullscreen stage";
+    scaleRef.refresh();   // re-fit canvas after transition
+  };
+  document.addEventListener("fullscreenchange", syncFsBtn);
+  document.addEventListener("webkitfullscreenchange", syncFsBtn);
+  fsBtn.onclick = () => {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      const req = fsStage.requestFullscreen || fsStage.webkitRequestFullscreen;
+      if (req) req.call(fsStage);
+    }
+  };
+
+  // Auto-play: Phaser 3 uses requestAnimationFrame which browsers throttle/stop when
+  // document.visibilityState === 'hidden' (background tab, CDP preview env, etc.).
+  // Fix: wake the game loop now, disable Phaser's onHidden auto-pause, and fall back
+  // to a setInterval ticker when RAF won't fire (page stays hidden).
+  const _game = this.game;
+  if (_game.onVisible) _game.onVisible();   // wake loop if it was sleeping
+  _game.onHidden = function() {};            // prevent future RAF sleep on tab hide
+  if (document.hidden) {
+    // RAF won't fire in a hidden page — drive Phaser's loop via setInterval instead
+    let _last = performance.now();
+    const _ticker = setInterval(() => {
+      if (!window.__game) { clearInterval(_ticker); return; }
+      const _now = performance.now();
+      try { _game.step(_now, _now - _last); } catch(e) {}
+      _last = _now;
+    }, 16);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) { clearInterval(_ticker); _game.onVisible && _game.onVisible(); }
+    }, { once: true });
+  }
+
+  // Start screen — pause scene until the user presses ▶ Start.
+  // Music and animation begin simultaneously on the user's explicit gesture.
+  const _sc = this;
+  this.scene.pause();
+  const startBtn = document.getElementById("start-btn");
+  if (startBtn) {
+    startBtn.onclick = () => {
+      document.getElementById("start-overlay").style.display = "none";
+      _sc.scene.resume();
+      // Start music on explicit user gesture only — no autoplay anywhere
+      bgMusic.volume = 0.55;
+      bgMusic.play().catch(() => {});
+    };
+  }
+}
+
+function update() {
+  const scene = this;
+  window.__step = step;
+
+  // camera pan with arrows
+  const cs = 400;
+  player.body.setVelocity(0);
+  if (cursors.left.isDown) player.body.setVelocityX(-cs);
+  if (cursors.right.isDown) player.body.setVelocityX(cs);
+  if (cursors.up.isDown) player.body.setVelocityY(-cs);
+  if (cursors.down.isDown) player.body.setVelocityY(cs);
+
+  // end of run -> 10-second celebration, then pause
+  if (all_movement[step] === undefined) {
+    if (!jobDone) {
+      jobDone = true;
+      jobDoneOverlay = scene.add.text(config.width / 2, config.height / 3, '🎉  Job Done!', {
+        font: 'bold 72px monospace', fill: '#ffd700',
+        stroke: '#1a0a00', strokeThickness: 8,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+      for (const u of Object.keys(personas)) {
+        const startY = personas[u].body.y;
+        scene.tweens.add({
+          targets: personas[u].body,
+          y: startY - 32,
+          yoyo: true, repeat: -1, duration: 380, ease: 'Sine.easeInOut',
+        });
+        pronunciatios[u].setText('🎉\n' + (agent_abbrs[u] || ''));
+        speech_bubbles[u].setVisible(false);
+        chat_texts[u].setVisible(false);
+      }
+      jobDoneTimer = 10 * 60;
+    }
+    for (const u of Object.keys(personas)) {
+      const _p = personas[u];
+      pronunciatios[u].x = _p.x;
+      pronunciatios[u].y = _p.y - _p.displayHeight * 0.5 - 6;
+    }
+    jobDoneTimer--;
+    if (jobDoneTimer <= 0) {
+      bgMusic.pause(); bgMusic.currentTime = 0;
+      scene.scene.restart();   // re-runs create() — clean replay state
+      const _ov = document.getElementById("start-overlay");
+      if (_ov) _ov.style.display = "flex";
+    }
+    return;
+  }
+
+  for (let i = 0; i < Object.keys(personas).length; i++) {
+    const u = Object.keys(personas)[i];
+    const p = personas[u];
+    const pron = pronunciatios[u];
+    const bubble = speech_bubbles[u];
+    const display = under_to_display[u];
+
+    if (display in all_movement[step]) {
+      const frame = all_movement[step][display];
+      if (execute_count === execute_count_max) {
+        // Target MUST use the same offset as the spawn position (below), otherwise a
+        // stationary agent sits a fixed 16px/32px away from its target and the engine
+        // nudges it every frame — visible idle jitter. Matching them = perfectly still.
+        movement_target[u] = [frame.movement[0] * TILE_WIDTH + TILE_WIDTH / 2,
+                              frame.movement[1] * TILE_WIDTH + TILE_WIDTH];
+        const pron_c = frame.pronunciatio;
+        const desc_c = frame.description || "";
+        const mode_c = frame.mode || "";          // M8: agent mode chip (DISCOVERY/GEN/VALIDATE/DEBUG/MITIGATE/REVIEW)
+        const chat_raw = frame.chat;
+        let chat_c = "";
+        if (chat_raw) { for (const c of chat_raw) chat_c += c[0] + ": " + c[1] + "<br>"; }
+        else chat_c = "";
+
+        pron.setText(pron_c + '\n' + (agent_abbrs[u] || '') + (mode_c ? '\n«' + mode_c + '»' : ''));
+        const qe = document.getElementById("quick_emoji-" + u);
+        const ca = document.getElementById("current_action__" + u);
+        const ta = document.getElementById("target_address__" + u);
+        const ch = document.getElementById("chat__" + u);
+        const card = document.getElementById("card-" + u);
+        if (qe) qe.textContent = pron_c;
+        if (ca) ca.textContent = desc_c.split("@")[0] || "";
+        if (ta) ta.textContent = desc_c.split("@")[1] || "";
+        if (ch) ch.innerHTML = chat_c;
+        logRecord(u, display, pron_c, desc_c, mode_c, chat_raw);
+        if (card) {
+          card.classList.toggle("gate", pron_c === world.emoji.gate_wait || pron_c === world.emoji.human_ok);
+          card.classList.toggle("active",
+            pron_c !== world.emoji.idle && pron_c !== world.emoji.gate_wait && pron_c !== world.emoji.human_ok);
+        }
+        if (chat_raw && chat_raw.length > 0) {
+          const line = chat_raw[0][1];
+          chat_texts[u].setText(line.length > 36 ? line.slice(0, 36) + '…' : line).setVisible(true);
+        } else {
+          chat_texts[u].setVisible(false);
+        }
+      }
+
+      if (execute_count > 0) {
+        if (p.body.x < movement_target[u][0]) { p.body.x += movement_speed; anims_direction = "r"; pre_anims_direction_dict[u] = "r"; }
+        else if (p.body.x > movement_target[u][0]) { p.body.x -= movement_speed; anims_direction = "l"; pre_anims_direction_dict[u] = "l"; }
+        else if (p.body.y < movement_target[u][1]) { p.body.y += movement_speed; anims_direction = "d"; pre_anims_direction_dict[u] = "d"; }
+        else if (p.body.y > movement_target[u][1]) { p.body.y -= movement_speed; anims_direction = "u"; pre_anims_direction_dict[u] = "u"; }
+        else anims_direction = "";
+
+        // label: centred on sprite x, bottom sits above sprite top edge
+        pron.x = p.x; pron.y = p.y - p.displayHeight * 0.5 - 6;
+        // speech bubble: above the label
+        chat_texts[u].x = p.x; chat_texts[u].y = p.y - p.displayHeight * 0.5 - 72;
+
+        if (anims_direction === "l") p.anims.play(u + "-left-walk", true);
+        else if (anims_direction === "r") p.anims.play(u + "-right-walk", true);
+        else if (anims_direction === "u") p.anims.play(u + "-up-walk", true);
+        else if (anims_direction === "d") p.anims.play(u + "-down-walk", true);
+        else {
+          // arrived / standing still: stop the walk cycle on a clean standing frame
+          p.anims.stop();
+          const d = pre_anims_direction_dict[u];
+          p.setTexture(u, d === "l" ? "left" : d === "r" ? "right" : d === "u" ? "up" : "down");
+        }
+      }
+    } else {
+      p.anims.stop();
+      const d = pre_anims_direction_dict[u];
+      if (d === "l") p.setTexture(u, "left"); else if (d === "r") p.setTexture(u, "right");
+      else if (d === "u") p.setTexture(u, "up"); else p.setTexture(u, "down");
+    }
+  }
+  if (execute_count === execute_count_max) renderActionLog();
+
+  if (execute_count === 0) {
+    // M2: no snap-to-target — sprites keep the position they slid to, so a far
+    // target is reached gradually over multiple steps (smooth walking, no teleport).
+    // The converter sizes each scene's step count to the travel distance, so the
+    // sprite arrives before the next scene begins.
+    execute_count = execute_count_max + 1;
+    step = step + 1;
+    start_datetime = new Date(start_datetime.getTime() + step_size);
+    document.getElementById("game-time-content").textContent =
+      start_datetime.toLocaleString("en-US", datetime_options);
+    // reveal archived docs once their filing step has been reached
+    for (const d of archiveDocs) d.t.setAlpha(step >= d.step ? 1 : 0);
+  }
+  execute_count -= 1;
+}
+
+boot();
+
+// Mute toggle — does NOT start music; Start button is the only trigger.
+document.getElementById('mute-btn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  bgMusic.muted = !bgMusic.muted;
+  this.textContent = bgMusic.muted ? '🔇' : '🔊';
+});
+</script>
+</body>
+</html>

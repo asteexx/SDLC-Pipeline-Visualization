@@ -1,0 +1,10 @@
+{
+  "run_id": "rainy_run",
+  "trace_id": "trace_rainy_001",
+  "started_at": "2026-06-26T09:00:00Z",
+  "ended_at": "2026-06-26T13:20:00Z",
+  "status": "completed",
+  "current_stage": "deployment",
+  "rerun_mode": false,
+  "_note": "Rainy-day demo: recovers from a conditional gate, a guardrail block, a circuit breaker, a review-rework loop, a QA coverage gate, a security-critical block, a canary failure, then a production incident (operate loop)."
+}

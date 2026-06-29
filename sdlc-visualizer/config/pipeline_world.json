@@ -1,0 +1,63 @@
+{
+  "_note": "Central mapping for the SDLC visualizer. Both convert_run.mjs and the front-end read this. M3 uses a bespoke procedurally-drawn OFFICE: each room has a rect [x,y,w,h] (tiles) drawn by index.html, and an anchor [x,y] (tile the agent stands on when working there). Agents have a 'home' desk tile. Coordinates are in tiles; world is map.width x map.height tiles.",
+  "map": { "name": "office", "tile_width": 32, "width": 64, "height": 32 },
+
+  "rooms": {
+    "requirements":     { "label": "Requirements",      "zone": "top", "rect": [2, 2, 11, 10],  "anchor": [7, 8] },
+    "planning":         { "label": "Planning",          "zone": "top", "rect": [14, 2, 11, 10], "anchor": [19, 8] },
+    "design":           { "label": "Design",            "zone": "top", "rect": [26, 2, 11, 10], "anchor": [31, 8] },
+    "qa_generate":      { "label": "QA Lab · Generate", "zone": "top", "rect": [38, 2, 11, 10], "anchor": [43, 8] },
+    "implementation":   { "label": "Dev Room",          "zone": "top", "rect": [50, 2, 12, 10], "anchor": [56, 8] },
+    "deployment":       { "label": "Deploy",            "zone": "bot", "rect": [2, 21, 14, 10],  "anchor": [9, 27] },
+    "security":         { "label": "Security",          "zone": "bot", "rect": [17, 21, 14, 10], "anchor": [24, 27] },
+    "qa_validate":      { "label": "QA Lab · Validate", "zone": "bot", "rect": [32, 21, 14, 10], "anchor": [39, 27] },
+    "review":           { "label": "Review",            "zone": "bot", "rect": [47, 21, 15, 10], "anchor": [54, 27] },
+    "archive":          { "label": "Archive",           "zone": "hub", "rect": [50, 13, 12, 7],  "anchor": [56, 16], "furniture": "archive" },
+    "production":       { "label": "Production",        "zone": "hub", "rect": [39, 13, 10, 7],  "anchor": [44, 16] },
+    "orchestrator_hub": { "label": "Orchestrator Hub",  "zone": "hub", "rect": [27, 13, 11, 7],  "anchor": [32, 16] },
+    "checkpoint_gate":  { "label": "Checkpoint Gate",   "zone": "gate","rect": [14, 13, 10, 7],  "anchor": [19, 16] },
+    "discovery":        { "label": "Discovery Studio",  "zone": "hub", "rect": [2, 13, 11, 7],   "anchor": [7, 16] }
+  },
+
+  "agents": {
+    "orchestrator":    { "display": "Orchestrator Bot",   "sprite": "Orchestrator_Bot",   "home": [32, 16] },
+    "product_agent":   { "display": "Product Analyst",    "sprite": "Product_Analyst",    "home": [7, 12] },
+    "planner_agent":   { "display": "Planner Bot",        "sprite": "Planner_Bot",        "home": [19, 12] },
+    "architect_agent": { "display": "Architect Designer", "sprite": "Architect_Designer", "home": [31, 12] },
+    "qa_agent":        { "display": "QA Engineer",        "sprite": "QA_Engineer",        "home": [43, 12] },
+    "developer_agent": { "display": "Dev Engineer",       "sprite": "Dev_Engineer",       "home": [56, 12] },
+    "review_agent":    { "display": "Review Critic",      "sprite": "Review_Critic",      "home": [54, 20] },
+    "security_agent":  { "display": "Security Analyst",   "sprite": "Security_Analyst",   "home": [24, 20] },
+    "devops_agent":    { "display": "DevOps Engineer",    "sprite": "DevOps_Engineer",    "home": [9, 20] },
+    "diff_agent":      { "display": "Diff Analyst",       "sprite": "Diff_Analyst",       "home": [4, 12] },
+    "human_lead":      { "display": "Human Lead",         "sprite": "Human_Lead",         "home": [19, 20] }
+  },
+
+  "lanes": { "top": 12, "bottom": 20, "_note": "corridor walking lanes (tile y). Rooms never occupy these rows; agents travel along a lane then enter through the door column (doorX = room anchor x)." },
+
+  "phases": {
+    "requirements":   { "agent": "product_agent",   "pronunciatio": "✍️", "action": "Refining requirements" },
+    "planning":       { "agent": "planner_agent",   "pronunciatio": "🗂️", "action": "Decomposing into tasks" },
+    "design":         { "agent": "architect_agent", "pronunciatio": "📐", "action": "Designing architecture" },
+    "qa_generate":    { "agent": "qa_agent",        "pronunciatio": "🧪", "action": "Generating tests (TDD)" },
+    "implementation": { "agent": "developer_agent", "pronunciatio": "⌨️", "action": "Implementing against tests" },
+    "review":         { "agent": "review_agent",    "pronunciatio": "🔍", "action": "Reviewing the diff" },
+    "qa_validate":    { "agent": "qa_agent",        "pronunciatio": "✅", "action": "Validating suite + coverage" },
+    "security":       { "agent": "security_agent",  "pronunciatio": "🔒", "action": "Security review" },
+    "deployment":     { "agent": "devops_agent",    "pronunciatio": "🚀", "action": "Phased rollout" }
+  },
+
+  "emoji": {
+    "idle": "💤",
+    "route": "🧭",
+    "gate_wait": "⏸️",
+    "gate_open": "🔓",
+    "human_ok": "🧑‍⚖️",
+    "fail": "🐛",
+    "fix": "🔧",
+    "pass": "✅",
+    "skip": "⏭️"
+  },
+
+  "flow": ["requirements", "planning", "design", "qa_generate", "implementation", "review", "qa_validate", "security", "deployment"]
+}
